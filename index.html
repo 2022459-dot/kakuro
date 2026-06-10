@@ -1,0 +1,842 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数谜塔防</title>
+    <style>
+        :root {
+            --bg-color: #f5f6fa;
+            --panel-bg: #ffffff;
+            --text-dark: #2c3e50;
+            --clue-bg: #2f3640;
+            --white-cell: #ffffff;
+            --btn-blue: #0984e3;
+            --btn-green: #4cd137;
+            --accent-orange: #e17055;
+            --btn-red: #c0392b;
+            --btn-purple: #9b59b6;
+        }
+
+        * {
+            box-shadow: none;
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Comic Sans MS', 'Chalkboard SE', 'Arial Rounded MT Bold', sans-serif;
+            user-select: none;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-dark);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 10px;
+        }
+
+        /* 统一外壳容器 */
+        .view-container {
+            width: 100%;
+            max-width: 820px;
+            background: var(--panel-bg);
+            border-radius: 24px;
+            box-shadow: 0 16px 40px rgba(0,0,0,0.2);
+            padding: 25px;
+            border: 6px solid #718093;
+            display: none; /* 动态切换 */
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .view-container.active {
+            display: flex;
+        }
+
+        /* 主页样式 */
+        .menu-title {
+            text-align: center;
+            font-size: 2.2rem;
+            color: var(--text-dark);
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 0px #dcdde1;
+        }
+        .menu-subtitle {
+            text-align: center;
+            color: #7f8c8d;
+            font-size: 1.1rem;
+            margin-bottom: 20px;
+        }
+        .menu-btn-group {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            width: 100%;
+            max-width: 400px;
+            margin: 0 auto;
+        }
+        .menu-btn {
+            padding: 15px;
+            font-size: 1.25rem;
+            font-weight: bold;
+            color: white;
+            border: none;
+            border-radius: 14px;
+            cursor: pointer;
+            transition: transform 0.1s;
+            text-align: center;
+        }
+        .menu-btn:active { transform: scale(0.98); }
+        .btn-to-zh { background: var(--btn-purple); }
+        .btn-to-en { background: var(--btn-blue); }
+        .btn-to-game { background: var(--btn-green); }
+
+        /* 规则页通用样式 */
+        .rule-header {
+            font-size: 1.6rem;
+            border-bottom: 3px solid #718093;
+            padding-bottom: 8px;
+            color: var(--text-dark);
+            margin-top: 10px;
+        }
+        .rule-content {
+            font-size: 1rem;
+            line-height: 1.6;
+            color: #34495e;
+            overflow-y: auto;
+            max-height: 60vh;
+            padding-right: 8px;
+        }
+        .rule-content h3 {
+            margin: 14px 0 6px 0;
+            color: var(--btn-blue);
+        }
+        .rule-content ul {
+            margin-left: 20px;
+            margin-bottom: 10px;
+        }
+        
+        /* 示例图片区域 */
+        .example-box {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: #f1f2f6;
+            padding: 12px;
+            border-radius: 12px;
+            margin: 10px 0;
+            border: 2px dashed #bdc3c7;
+        }
+        .example-img {
+            max-width: 180px;
+            border-radius: 8px;
+            border: 2px solid #718093;
+            margin-bottom: 5px;
+        }
+
+        .btn-back {
+            background: #718093;
+            color: white;
+            padding: 10px;
+            border: none;
+            border-radius: 10px;
+            font-weight: bold;
+            cursor: pointer;
+            width: 120px;
+            margin-top: 10px;
+        }
+
+        /* 核心游戏HUD及原有样式 */
+        #hud {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            text-align: center;
+            background: #f8f9fa;
+            padding: 12px 10px;
+            border-radius: 16px;
+            border: 2px solid #dcdde1;
+            font-size: 1.05rem;
+            font-weight: bold;
+            gap: 5px;
+            align-items: center;
+        }
+        .main-layout { display: flex; flex-direction: row; gap: 15px; justify-content: center; align-items: flex-start; }
+        @media (max-width: 740px) { .main-layout { flex-direction: column; align-items: center; } }
+        .puzzle-section { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+        #kakuro-container { background: #718093; padding: 6px; border-radius: 12px; display: inline-block; }
+        #kakuro-grid { display: grid; gap: 5px; }
+        
+        .cell {
+            width: 70px; height: 70px; background: var(--white-cell); border-radius: 8px;
+            display: flex; justify-content: center; align-items: center; font-size: 1.7rem;
+            font-weight: bold; cursor: pointer; position: relative; transition: all 0.2s;
+        }
+        .cell.clue { background: var(--clue-bg); color: #ffffff; cursor: default; }
+        .clue-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+        .clue-val { position: absolute; font-size: 0.95rem; font-weight: bold; }
+        .clue-down { bottom: 4px; left: 8px; color: #00a8ff; }
+        .clue-across { top: 4px; right: 8px; color: #ff7675; }
+        .cell.selected { box-shadow: inset 0 0 0 4px var(--btn-blue); background: #e3f2fd; }
+        .cell.correct { background: #e2fbe8 !important; color: #4cd137; }
+        .cell.wrong { background: #ffebee !important; color: #c0392b; }
+
+        .controls-section { display: flex; flex-direction: column; gap: 12px; width: 280px; }
+        .control-block { background: #f8f9fa; border-radius: 16px; padding: 10px; border: 2px solid #dcdde1; }
+        .block-title { font-size: 0.9rem; text-transform: uppercase; color: #7f8c8d; margin-bottom: 6px; text-align: center; font-weight: bold; }
+        .keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
+        .key-btn { background: #ffffff; border: 2px solid #dcdde1; border-radius: 8px; padding: 8px; font-size: 1.2rem; font-weight: bold; cursor: pointer; color: var(--text-dark); }
+        
+        .shop-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+        .shop-btn {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            background: white; border: 2px solid #dcdde1; padding: 8px 4px; border-radius: 10px;
+            cursor: pointer; font-weight: bold; font-size: 0.85rem; text-align: center; gap: 2px;
+            transition: all 0.1s ease;
+        }
+        .shop-btn.selected { border-color: var(--btn-blue); background: #e3f2fd; box-shadow: 0 0 8px rgba(9, 132, 227, 0.5); transform: scale(1.02); }
+        .shop-mode-btn { background: #f1f2f6; border: 2px solid #bdc3c7; color: #57606f; }
+        .shop-mode-btn.selected { border-color: var(--btn-red); background: #ffebee; color: var(--btn-red); box-shadow: 0 0 8px rgba(192, 57, 43, 0.5); }
+        
+        .btn-action { width: 100%; padding: 10px; font-size: 1rem; font-weight: bold; color: white; border: none; border-radius: 12px; cursor: pointer; }
+
+        #defense-lane-container { background: #353b48; border-radius: 16px; padding: 8px; border: 3px solid #2f3640; position: relative; }
+        #defense-canvas { display: block; background: #2f3640; border-radius: 8px; width: 100%; height: 140px; cursor: crosshair; }
+
+        .leaderboard-block { background: #2c3e50; border-radius: 16px; padding: 15px; color: white; }
+        .leaderboard-title { font-size: 1.1rem; text-align: center; font-weight: bold; margin-bottom: 10px; color: #f1c40f; display: flex; justify-content: center; align-items: center; gap: 6px; }
+        .leaderboard-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; text-align: center; }
+        .leaderboard-table th, .leaderboard-table td { padding: 6px 4px; border-bottom: 1px solid #34495e; }
+        .no-record { text-align: center; color: #7f8c8d; padding: 10px 0; font-size: 0.85rem; }
+    </style>
+</head>
+<body>
+
+    <div id="view-home" class="view-container active">
+        <h1 class="menu-title">🧩 数谜塔防🗼<br>Created by Pin Hwa High School<br>(VOON YONG JUN)</h1>
+        <p class="menu-subtitle">数谜解谜结合行道塔防，脑力与战术的双重博弈</p>
+        <div class="menu-btn-group">
+            <button class="menu-btn btn-to-zh" onclick="switchView('zh')">📜 游戏规则 (中文)</button>
+            <button class="menu-btn btn-to-en" onclick="switchView('en')">📘 Game Rules (English)</button>
+            <button class="menu-btn btn-to-game" onclick="startGameSession()">⚔️ 开始游戏 (Game)</button>
+        </div>
+    </div>
+
+    <div id="view-rules-zh" class="view-container">
+        <h2 class="rule-header">📜 游戏规则说明手册</h2>
+        <div class="rule-content">
+            <h3>🏆 核心玩法概述</h3>
+            <p>本游戏是一款将<b>数谜 (Kakuro) 解谜</b>与<b>行道式策略塔防</b>完美结合的硬核竞技游戏。玩家需要一边在左侧破解数谜方块来赚取能量，一边利用能量在右侧战场布防，阻击不断涌入并试图抢走你蛋糕/布丁的怪兽。</p>
+            
+            <h3>🧩 Kakuro (数谜) 规则详细讲解</h3>
+            <p>在左侧的数谜盘面中，玩家需要在每一个<b>白色可输入方块</b>中填入 <b>1 到 9</b> 的数字，并满足以下核心条件：</p>
+            <ul>
+                <li>每一行或每一列连续的白色方块中，<b>填入的数字之和必须完全等于对应的提示线上的线索数字</b>。</li>
+                <li>同一行或同一列被线索分割的连续白色方块里，<b>填入的数字不能重复</b>。</li>
+            </ul>
+            
+            <div class="example-box">
+                <img class="example-img" src="data:image/png;base64,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" alt="Kakuro 示例图片">
+                <div><b>💡 实战图例拆解：</b></div>
+                <div>左上方线索为 <b>14</b>（横向之和），白色格填入 <b>9 和 5</b>（9 + 5 = 14）</div>
+                <div>左下方线索为 <b>4</b>（横向之和），白色格填入 <b>3 和 1</b>（3 + 1 = 4）</div>
+            </div>
+
+            <h3>⚡ 极速操作说明（最新优化）</h3>
+            <ul>
+                <li><b>连放防御塔</b>：点击购买列表中的任意防御塔后，会进入锁定的“建造模式”。此时在右侧战场点击，可以<b>无限次连续放置防御塔</b>，不再需要每放一座就重选一次。</li>
+                <li><b>秒升级/秒卖出（连按）</b>：在没有选中任何购买商品的状态下，直接点击场上的防御塔就能<b>瞬间触发升级</b>，可以对着同一座塔<b>疯狂连按快速升满级</b>！如果切换到“一键拆除”模式，点到哪里就会秒卖哪里。</li>
+                <li><b>取消选择</b>：随时点击左边数谜格，或者在战场画布上右击，即可轻松退出当前的建造或拆除模式。</li>
+            </ul>
+        </div>
+        <button class="btn-back" onclick="switchView('home')">⬅ 返回主页</button>
+    </div>
+
+    <div id="view-rules-en" class="view-container">
+        <h2 class="rule-header">📘 Game Rules & Gameplay Overview</h2>
+        <div class="rule-content">
+            <p>This game is a single-player strategy game that combines <b>Kakuro puzzles</b> with <b>Tower Defense</b> gameplay.</p>
+            
+            <h3>🧩 Kakuro Puzzle Rules</h3>
+            <p>Fill each white cell with numbers from <b>1 to 9</b> so that the sum of the numbers in each entry matches the given clue number.</p>
+
+            <h3>⚡ Continuous Placement & Fast Upgrades</h3>
+            <ul>
+                <li><b>Continuous Tower Placement</b>: Clicking a tower in the shop locks you into "Build Mode". You can click on the battlefield multiple times to <b>place towers continuously</b> without re-selecting.</li>
+                <li><b>Spam Click Upgrades</b>: When no shop item is selected, directly clicking an existing tower on the field will <b>upgrade it instantly</b>. You can spam click to max out a tower in half a second!</li>
+                <li><b>Cancel Mode</b>: Click any white cell on the left or right-click on the battlefield to clear your current shop selection.</li>
+            </ul>
+        </div>
+        <button class="btn-back" onclick="switchView('home')">⬅ Back to Home</button>
+    </div>
+
+    <div id="view-game" class="view-container">
+        
+        <div id="hud">
+            <div>🎈 关卡: <span id="hud-level">1 / 10</span></div>
+            <div>⚡ 能量: <span id="hud-energy">80</span></div>
+            <div>🗼 塔数: <span id="hud-towers">0 / 15</span></div>
+            <div>❤️ 生命: <span id="hud-hearts">❤️❤️❤️❤️❤️</span></div>
+            <div>⏱️ 时间: <span id="hud-timer">00:00</span></div>
+        </div>
+
+        <div class="main-layout">
+            <div class="puzzle-section">
+                <div id="kakuro-container">
+                    <div id="kakuro-grid"></div>
+                </div>
+                <button class="btn-action" style="background: var(--accent-orange);" onclick="useHint()">💡 智能提示</button>
+            </div>
+
+            <div class="controls-section">
+                <div class="control-block">
+                    <div class="block-title">快捷数字键入:</div>
+                    <div class="keypad">
+                        <button class="key-btn" onclick="pressNumber(1)">1</button>
+                        <button class="key-btn" onclick="pressNumber(2)">2</button>
+                        <button class="key-btn" onclick="pressNumber(3)">3</button>
+                        <button class="key-btn" onclick="pressNumber(4)">4</button>
+                        <button class="key-btn" onclick="pressNumber(5)">5</button>
+                        <button class="key-btn" onclick="pressNumber(6)">6</button>
+                        <button class="key-btn" onclick="pressNumber(7)">7</button>
+                        <button class="key-btn" onclick="pressNumber(8)">8</button>
+                        <button class="key-btn" onclick="pressNumber(9)">9</button>
+                    </div>
+                </div>
+
+                <div class="control-block">
+                    <div class="block-title">选购区（已开启持续连放模式）:</div>
+                    <div class="shop-grid">
+                        <div id="shop-bubble" class="shop-btn" onclick="selectShopTower('bubble', 25)">
+                            <span>🧼 极速泡泡</span>
+                            <span style="color:var(--accent-orange)">⭐25</span>
+                        </div>
+                        <div id="shop-jelly" class="shop-btn" onclick="selectShopTower('jelly', 30)">
+                            <span>🍇 强效减速</span>
+                            <span style="color:var(--accent-orange)">⭐30</span>
+                        </div>
+                        <div id="shop-lightning" class="shop-btn" onclick="selectShopTower('lightning', 45)">
+                            <span>⚡ 雷电连锁</span>
+                            <span style="color:var(--accent-orange)">⭐45</span>
+                        </div>
+                        <div id="shop-sniper" class="shop-btn" onclick="selectShopTower('sniper', 60)">
+                            <span>🎯 重炮狙击</span>
+                            <span style="color:var(--accent-orange)">⭐60</span>
+                        </div>
+                        <div id="shop-sell-mode" class="shop-btn shop-mode-btn" style="grid-column: span 2;" onclick="selectSellMode()">
+                            <span>💰 切换到【一键无损拆塔】模式</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="defense-lane-container">
+            <div id="control-hint-bar" class="block-title" style="margin-bottom:4px; color:#f5f6fa; font-size: 0.82rem;">
+                🎮 战术提示：普通状态下点击已有塔可【瞬间升级】并支持连按。右击画布可清空选择。
+            </div>
+            <canvas id="defense-canvas" width="740" height="140" onclick="handleCanvasClick(event)" oncontextmenu="handleCanvasRightClick(event)"></canvas>
+        </div>
+
+        <div class="leaderboard-block">
+            <div class="leaderboard-title">🏆 本地数谜塔防英雄榜</div>
+            <table class="leaderboard-table">
+                <thead>
+                    <tr>
+                        <th>排名</th>
+                        <th>玩家名称</th>
+                        <th>通关/最高关卡</th>
+                        <th>总消耗时间</th>
+                    </tr>
+                </thead>
+                <tbody id="leaderboard-rows"></tbody>
+            </table>
+        </div>
+        <button class="btn-back" style="width: 100%;" onclick="exitToHome()">退出并返回主页</button>
+    </div>
+
+    <script>
+        const levelPool = [
+            [[{type:'C'},{type:'C',clues:[7,0]},{type:'C',clues:[6,0]}],[{type:'C',clues:[0,9]},{type:'W',ans:5},{type:'W',ans:4}],[{type:'C',clues:[0,4]},{type:'W',ans:2},{type:'W',ans:2}]],
+            [[{type:'C'},{type:'C',clues:[12,0]},{type:'C',clues:[11,0]}],[{type:'C',clues:[0,17]},{type:'W',ans:8},{type:'W',ans:9}],[{type:'C',clues:[0,6]},{type:'W',ans:4},{type:'W',ans:2}]],
+            [[{type:'C'},{type:'C',clues:[12,0]},{type:'C',clues:[7,0]}],[{type:'C',clues:[0,15]},{type:'W',ans:9},{type:'W',ans:6}],[{type:'C',clues:[0,4]},{type:'W',ans:3},{type:'W',ans:1}]],
+            [[{type:'C'},{type:'C',clues:[8,0]},{type:'C',clues:[4,0]}],[{type:'C',clues:[0,9]},{type:'W',ans:6},{type:'W',ans:3}],[{type:'C',clues:[0,3]},{type:'W',ans:2},{type:'W',ans:1}]],
+            [[{type:'C'},{type:'C',clues:[20,0]},{type:'C',clues:[7,0]},{type:'C',clues:[6,0]}],[{type:'C',clues:[0,15]},{type:'W',ans:8},{type:'W',ans:4},{type:'W',ans:3}],[{type:'C',clues:[0,11]},{type:'W',ans:7},{type:'W',ans:2},{type:'W',ans:2}],[{type:'C',clues:[0,7]},{type:'W',ans:5},{type:'W',ans:1},{type:'W',ans:1}]],
+            [[{type:'C'},{type:'C',clues:[10,0]},{type:'C',clues:[8,0]}],[{type:'C',clues:[0,12]},{type:'W',ans:7},{type:'W',ans:5}],[{type:'C',clues:[0,6]},{type:'W',ans:3},{type:'W',ans:3}]],
+            [[{type:'C'},{type:'C',clues:[6,0]},{type:'C',clues:[4,0]}],[{type:'C',clues:[0,7]},{type:'W',ans:4},{type:'W',ans:3}],[{type:'C',clues:[0,3]},{type:'W',ans:2},{type:'W',ans:1}]],
+            [[{type:'C'},{type:'C',clues:[15,0]},{type:'C',clues:[14,0]}],[{type:'C',clues:[0,16]},{type:'W',ans:9},{type:'W',ans:7}],[{type:'C',clues:[0,13]},{type:'W',ans:6},{type:'W',ans:7}]],
+            [[{type:'C'},{type:'C',clues:[16,0]},{type:'C',clues:[12,0]}],[{type:'C',clues:[0,17]},{type:'W',ans:9},{type:'W',ans:8}],[{type:'C',clues:[0,11]},{type:'W',ans:7},{type:'W',ans:4}]],
+            [[{type:'C'},{type:'C',clues:[24,0]},{type:'C',clues:[11,0]},{type:'C',clues:[10,0]}],[{type:'C',clues:[0,23]},{type:'W',ans:9},{type:'W',ans:8},{type:'W',ans:6}],[{type:'C',clues:[0,12]},{type:'W',ans:8},{type:'W',ans:2},{type:'W',ans:2}],[{type:'C',clues:[0,10]},{type:'W',ans:7},{type:'W',ans:1},{type:'W',ans:2}]]
+        ];
+
+        let currentLevelIndex = 0;
+        let activeLevelMap = [];
+        let energyStars = 80;
+        let hearts = 5;       
+        const TOWER_LIMIT = 15;
+
+        let totalSeconds = 0;
+        let timerIntervalId = null;
+        let timerIsPaused = false;
+
+        let preparationCountdown = 3; 
+        let preparationIntervalId = null;
+
+        let focusRow = -1; let focusCol = -1;
+        let activeShopSelection = null; let activeShopCost = 0;
+        let isSellModeActive = false; // 是否开启了一键无损拆塔模式
+
+        let towers = []; let enemies = []; let projectiles = []; let chainsVisual = []; 
+        let spawnTimeoutId = null; let loopAnimationId = null;
+
+        const canvas = document.getElementById('defense-canvas');
+        const ctx = canvas.getContext('2d');
+
+        function switchView(viewName) {
+            document.querySelectorAll('.view-container').forEach(el => el.classList.remove('active'));
+            if (viewName === 'home') document.getElementById('view-home').classList.add('active');
+            else if (viewName === 'zh') document.getElementById('view-rules-zh').classList.add('active');
+            else if (viewName === 'en') document.getElementById('view-rules-en').classList.add('active');
+            else if (viewName === 'game') document.getElementById('view-game').classList.add('active');
+        }
+
+        function startGameSession() {
+            switchView('game');
+            currentLevelIndex = 0;
+            totalSeconds = 0;
+            hearts = 5;
+            energyStars = 80;
+            renderLeaderboard();
+            startGlobalTimer();
+            initLevelSession();
+            if(!loopAnimationId) runMainLoop();
+        }
+
+        function exitToHome() {
+            if (timerIntervalId) clearInterval(timerIntervalId);
+            if (spawnTimeoutId) clearTimeout(spawnTimeoutId);
+            if (preparationIntervalId) clearInterval(preparationIntervalId);
+            switchView('home');
+        }
+
+        function startGlobalTimer() {
+            if (timerIntervalId) clearInterval(timerIntervalId);
+            timerIntervalId = setInterval(() => {
+                if (!timerIsPaused) {
+                    totalSeconds++;
+                    const mins = String(Math.floor(totalSeconds / 60)).padStart(2, '0');
+                    const secs = String(totalSeconds % 60).padStart(2, '0');
+                    document.getElementById('hud-timer').innerText = `${mins}:${secs}`;
+                }
+            }, 1000);
+        }
+
+        function initLevelSession() {
+            activeLevelMap = JSON.parse(JSON.stringify(levelPool[currentLevelIndex]));
+            towers = []; enemies = []; projectiles = []; chainsVisual = [];
+            focusRow = -1; focusCol = -1; 
+            resetShopSelection();
+            
+            updateHUDDisplay();
+            buildInteractiveGrid();
+            
+            if (spawnTimeoutId) clearTimeout(spawnTimeoutId);
+            if (preparationIntervalId) clearInterval(preparationIntervalId);
+
+            timerIsPaused = true; 
+            preparationCountdown = 3;
+
+            preparationIntervalId = setInterval(() => {
+                preparationCountdown--;
+                if (preparationCountdown <= 0) {
+                    clearInterval(preparationIntervalId);
+                    preparationIntervalId = null;
+                    timerIsPaused = false; 
+                    spawnHarderMonsterLoop(); 
+                }
+            }, 1000);
+        }
+
+        function buildInteractiveGrid() {
+            const gridContainer = document.getElementById('kakuro-grid');
+            gridContainer.innerHTML = '';
+            const size = activeLevelMap.length; 
+            gridContainer.style.gridTemplateColumns = `repeat(${size}, 70px)`;
+            gridContainer.style.gridTemplateRows = `repeat(${size}, 70px)`;
+
+            for (let r = 0; r < size; r++) {
+                for (let c = 0; c < size; c++) {
+                    const data = activeLevelMap[r][c];
+                    const el = document.createElement('div');
+                    el.classList.add('cell');
+                    el.id = `cell-${r}-${c}`;
+
+                    if (data.type === 'C') {
+                        el.classList.add('clue');
+                        if (data.clues) {
+                            el.innerHTML = `
+                                <svg class="clue-svg"><line x1="0" y1="0" x2="70" y2="70" stroke="#4b5563" stroke-width="2.5"/></svg>
+                                ${data.clues[0] ? `<span class="clue-val clue-down">${data.clues[0]}</span>` : ''}
+                                ${data.clues[1] ? `<span class="clue-val clue-across">${data.clues[1]}</span>` : ''}
+                            `;
+                        } else { el.style.background = '#1e272e'; }
+                    } else if (data.type === 'W') {
+                        el.addEventListener('click', () => handleCellSelect(r, c));
+                    }
+                    gridContainer.appendChild(el);
+                }
+            }
+        }
+
+        function handleCellSelect(r, c) {
+            // 选择左边数谜时，自动脱离建塔/拆塔模式
+            resetShopSelection();
+            if (focusRow !== -1) {
+                const prev = document.getElementById(`cell-${focusRow}-${focusCol}`);
+                if (prev) prev.classList.remove('selected');
+            }
+            focusRow = r; focusCol = c;
+            const targetCell = document.getElementById(`cell-${r}-${c}`);
+            if (targetCell) targetCell.classList.add('selected');
+        }
+
+        function pressNumber(num) {
+            if (focusRow === -1 || focusCol === -1) return;
+            const cellData = activeLevelMap[focusRow][focusCol];
+            const cellElement = document.getElementById(`cell-${focusRow}-${focusCol}`);
+            if (!cellElement) return;
+
+            cellElement.innerText = num;
+            cellData.currentGuess = num;
+
+            if (num === cellData.ans) {
+                cellElement.className = "cell correct";
+                energyStars += 45; 
+                updateHUDDisplay();
+                checkPuzzleWinCondition();
+            } else { cellElement.className = "cell wrong"; }
+        }
+
+        function useHint() {
+            if (focusRow === -1 || focusCol === -1) { alert("请先在左侧选择一个待填写的白色方块！"); return; }
+            alert(`💡 智能提示：当前选中的方块正确答案是 ${activeLevelMap[focusRow][focusCol].ans}`);
+        }
+
+        // 选购防御塔：开启单按连放模式
+        function selectShopTower(type, cost) {
+            isSellModeActive = false;
+            activeShopSelection = type;
+            activeShopCost = cost;
+            document.querySelectorAll('.shop-btn').forEach(b => b.classList.remove('selected'));
+            document.getElementById(`shop-${type}`).classList.add('selected');
+            document.getElementById('control-hint-bar').innerText = `🧱 当前处于【连续建造模式】：可在右侧战场连续点击放塔。点击数谜格或右击可取消。`;
+        }
+
+        // 切换到无损拆塔模式
+        function selectSellMode() {
+            activeShopSelection = null;
+            activeShopCost = 0;
+            isSellModeActive = true;
+            document.querySelectorAll('.shop-btn').forEach(b => b.classList.remove('selected'));
+            document.getElementById('shop-sell-mode').classList.add('selected');
+            document.getElementById('control-hint-bar').innerText = `💰 当前处于【快速拆解模式】：在战场上点击任何已建的塔都会秒无损退款！`;
+        }
+
+        // 重置/退出任何特殊商店模式
+        function resetShopSelection() {
+            activeShopSelection = null;
+            activeShopCost = 0;
+            isSellModeActive = false;
+            document.querySelectorAll('.shop-btn').forEach(b => b.classList.remove('selected'));
+            document.getElementById('control-hint-bar').innerText = `HTML5 🎮 局内操控：普通状态下点击已有塔可【瞬间升级】并支持连按。右击画布可清空选择。`;
+        }
+
+        function handleCanvasRightClick(event) {
+            event.preventDefault();
+            resetShopSelection();
+        }
+
+        function handleCanvasClick(event) {
+            const rect = canvas.getBoundingClientRect();
+            const clickX = event.clientX - rect.left;
+            const clickY = event.clientY - rect.top;
+
+            // 检查是否点中了已经存在的塔
+            let clickedExistingTower = null;
+            towers.forEach(t => {
+                let dist = Math.sqrt((t.x - clickX)**2 + (t.y - clickY)**2);
+                if (dist < 22) clickedExistingTower = t;
+            });
+
+            // 模式 A：如果处于一键拆塔模式
+            if (isSellModeActive) {
+                if (clickedExistingTower) {
+                    energyStars += clickedExistingTower.cost;
+                    towers = towers.filter(t => t !== clickedExistingTower);
+                    updateHUDDisplay();
+                }
+                return;
+            }
+
+            // 模式 B：如果处于连续建造放置模式
+            if (activeShopSelection) {
+                if (clickedExistingTower) {
+                    return; // 如果点在别人的塔上，不重复叠放
+                }
+                if (towers.length >= TOWER_LIMIT) { 
+                    alert(`🚨 已达当前关卡部署上限 (${TOWER_LIMIT}/${TOWER_LIMIT})！`); 
+                    resetShopSelection();
+                    return; 
+                }
+                if (energyStars < activeShopCost) { 
+                    alert("能量不够，请优先在左侧填入正确数字获取能量！"); 
+                    resetShopSelection();
+                    return; 
+                }
+
+                if (clickX > 25 && clickX < 650) {
+                    energyStars -= activeShopCost;
+                    towers.push({ x: clickX, y: 40, type: activeShopSelection, cost: activeShopCost, level: 1, fireCooldown: 0 });
+                    updateHUDDisplay();
+                    // 注意：此处没有 resetShopSelection()，从而实现了令人爽快的【连放功能】！
+                }
+                return;
+            }
+
+            // 模式 C：普通模式下，点击已有塔 = 【直接极速升级并支持连按】！
+            if (clickedExistingTower) {
+                if (clickedExistingTower.level >= 3) {
+                    return; // 已经满级，无需反应
+                }
+                let upCost = getUpgradeCost(clickedExistingTower);
+                if (energyStars < upCost) {
+                    alert("能量不足，无法升级该防御塔！");
+                    return;
+                }
+                // 直接扣钱升级
+                energyStars -= upCost;
+                clickedExistingTower.cost += upCost;
+                clickedExistingTower.level += 1;
+                updateHUDDisplay();
+            }
+        }
+
+        function getUpgradeCost(t) {
+            if (t.level === 1) return Math.floor(t.cost * 0.8);  
+            if (t.level === 2) return Math.floor(t.cost * 1.2);  
+            return 0;
+        }
+
+        function updateHUDDisplay() {
+            let isBoss = (currentLevelIndex === 4 || currentLevelIndex === 9) ? " (Boss)" : "";
+            document.getElementById('hud-level').innerText = `${currentLevelIndex + 1}${isBoss} / 10`;
+            document.getElementById('hud-energy').innerText = energyStars;
+            document.getElementById('hud-towers').innerText = `${towers.length} / ${TOWER_LIMIT}`;
+            document.getElementById('hud-hearts').innerText = "❤️".repeat(hearts) || "❌";
+        }
+
+        function spawnHarderMonsterLoop() {
+            if (hearts <= 0 || preparationIntervalId !== null) return;
+            let stage = currentLevelIndex + 1;
+            let isBossStage = (stage === 5 || stage === 10);
+            let rand = Math.random();
+
+            let isBoss = isBossStage && rand < 0.25;
+            let isRunner = !isBoss && rand < 0.4;
+
+            let speed = isRunner ? 3.3 : (isBoss ? 0.6 : 1.4 + (stage * 0.15));
+            let hp = (45 + (stage * 28)) * (isBoss ? 6.0 : (isRunner ? 0.55 : 1.3));
+
+            enemies.push({
+                x: -30, y: 90, speed: speed, hp: hp, maxHp: hp,
+                type: isBoss ? 'boss' : (isRunner ? 'runner' : 'normal'),
+                color: isBoss ? '#8c7ae6' : (isRunner ? '#e74c3c' : '#00d2d3'),
+                radius: isBoss ? 22 : (isRunner ? 11 : 14), slowedTicks: 0
+            });
+
+            let interval = Math.max(850, 3100 - (stage * 240));
+            spawnTimeoutId = setTimeout(spawnHarderMonsterLoop, interval);
+        }
+
+        function getLeaderboard() {
+            const data = localStorage.getItem('kakuro_td_leaderboard');
+            return data ? JSON.parse(data) : [];
+        }
+
+        function saveToLeaderboard(playerName, reachedStage, totalSecs) {
+            const board = getLeaderboard();
+            board.push({ name: playerName, stage: reachedStage, time: totalSecs, date: new Date().toLocaleDateString() });
+            board.sort((a, b) => b.stage !== a.stage ? b.stage - a.stage : a.time - b.time);
+            if (board.length > 5) board.length = 5;
+            localStorage.setItem('kakuro_td_leaderboard', JSON.stringify(board));
+            renderLeaderboard();
+        }
+
+        function renderLeaderboard() {
+            const board = getLeaderboard();
+            const container = document.getElementById('leaderboard-rows');
+            container.innerHTML = '';
+            if (board.length === 0) {
+                container.innerHTML = `<tr><td colspan="4" class="no-record">暂无记录，快来创造你的战绩吧！</td></tr>`;
+                return;
+            }
+            board.forEach((record, index) => {
+                const mins = String(Math.floor(record.time / 60)).padStart(2, '0');
+                const secs = String(record.time % 60).padStart(2, '0');
+                let medal = index === 0 ? '🥇' : (index === 1 ? '🥈' : (index === 2 ? '🥉' : `${index + 1}`));
+                container.innerHTML += `<tr><td>${medal}</td><td>${record.name}</td><td style="color:#2ecc71; font-weight:bold;">Stage ${record.stage}</td><td>${mins}:${secs}</td></tr>`;
+            });
+        }
+
+        function triggerGameOver(isUltimateWin = false) {
+            if (timerIntervalId) clearInterval(timerIntervalId);
+            if (spawnTimeoutId) clearTimeout(spawnTimeoutId);
+            if (preparationIntervalId) clearInterval(preparationIntervalId);
+
+            const scoreStage = isUltimateWin ? 10 : (currentLevelIndex + 1);
+            const statusTitle = isUltimateWin ? "👑 【完美通关制霸】 👑" : "💥 【战线告负 5血归零】 💥";
+            const mins = String(Math.floor(totalSeconds / 60)).padStart(2, '0');
+            const secs = String(totalSeconds % 60).padStart(2, '0');
+
+            setTimeout(() => {
+                alert(`${statusTitle}\n你最终达成：Stage ${scoreStage}\n总历时：${mins}分${secs}秒`);
+                let name = prompt("请输入您的尊姓大名记入本地英雄榜：");
+                if (!name || name.trim() === "") name = "无名勇士";
+                saveToLeaderboard(name.trim(), scoreStage, totalSeconds);
+                exitToHome();
+            }, 200);
+        }
+
+        function runMainLoop() {
+            ctx.fillStyle = '#2f3640'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#3d3d3d'; ctx.fillRect(0, 65, canvas.width, 50);
+
+            ctx.fillStyle = '#e84118'; ctx.beginPath(); ctx.arc(700, 90, 24, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = '#fff'; ctx.font = '16px Arial'; ctx.fillText('🧁', 691, 96);
+
+            towers.forEach(t => {
+                ctx.fillStyle = t.level === 1 ? '#7f8c8d' : (t.level === 2 ? '#dcdde1' : '#f1c40f');
+                ctx.fillRect(t.x - 14, t.y + 14, 28, 6);
+
+                if (t.type === 'bubble') ctx.fillStyle = '#00a8ff';
+                else if (t.type === 'jelly') ctx.fillStyle = '#fbc531';
+                else if (t.type === 'lightning') ctx.fillStyle = '#9c27b0';
+                else ctx.fillStyle = '#e91e63';
+
+                ctx.beginPath(); ctx.arc(t.x, t.y, 14 + t.level * 2, 0, Math.PI * 2); ctx.fill();
+                ctx.fillStyle = '#ffffff'; ctx.fillRect(t.x - 3, t.y, 6, 12);
+                ctx.fillStyle = '#ffffff'; ctx.font = 'bold 10px Arial'; ctx.fillText(`L${t.level}`, t.x - 6, t.y - 2);
+
+                if (preparationIntervalId === null) {
+                    if (t.fireCooldown > 0) { t.fireCooldown--; } 
+                    else if (enemies.length > 0) {
+                        let lvlBonus = t.level;
+                        if (t.type === 'lightning') {
+                            let targetCount = 0; let lastX = t.x, lastY = t.y; let maxChain = 2 + lvlBonus; 
+                            for (let k = 0; k < enemies.length; k++) {
+                                let e = enemies[k];
+                                if (e.x > 0 && Math.abs(e.x - lastX) < (220 + lvlBonus * 20)) {
+                                    e.hp -= (15 * lvlBonus); 
+                                    chainsVisual.push({x1: lastX, y1: lastY, x2: e.x, y2: e.y, alpha: 1.0});
+                                    lastX = e.x; lastY = e.y; targetCount++;
+                                    if (targetCount >= maxChain) break;
+                                }
+                            }
+                            if (targetCount > 0) {
+                                t.fireCooldown = Math.max(25, 45 - lvlBonus * 5);
+                                for (let k = enemies.length - 1; k >= 0; k--) {
+                                    if (enemies[k].hp <= 0) { enemies.splice(k, 1); energyStars += 8; }
+                                }
+                                updateHUDDisplay();
+                            }
+                        } else {
+                            let target = enemies[0];
+                            if (target.x > 0) {
+                                let bulletSpeed = t.type === 'sniper' ? 14 : 9;
+                                projectiles.push({ x: t.x, y: t.y, target: target, type: t.type, speed: bulletSpeed, level: t.level });
+                                t.fireCooldown = t.type === 'bubble' ? (16 - lvlBonus * 2) : (t.type === 'jelly' ? 28 : (68 - lvlBonus * 6));
+                            }
+                        }
+                    }
+                }
+            });
+
+            for (let i = chainsVisual.length - 1; i >= 0; i--) {
+                let c = chainsVisual[i]; ctx.strokeStyle = `rgba(255, 242, 0, ${c.alpha})`; ctx.lineWidth = 3.5;
+                ctx.beginPath(); ctx.moveTo(c.x1, c.y1); ctx.lineTo(c.x2, c.y2); ctx.stroke();
+                c.alpha -= 0.16; if (c.alpha <= 0) chainsVisual.splice(i, 1);
+            }
+
+            for (let i = projectiles.length - 1; i >= 0; i--) {
+                let p = projectiles[i];
+                if (!enemies.includes(p.target)) { projectiles.splice(i, 1); continue; }
+                let dx = p.target.x - p.x; let dy = p.target.y - p.y; let dist = Math.sqrt(dx*dx + dy*dy);
+                if (dist > 8) {
+                    p.x += (dx / dist) * p.speed; p.y += (dy / dist) * p.speed;
+                    ctx.fillStyle = p.type === 'bubble' ? '#00cfff' : (p.type === 'jelly' ? '#fff300' : '#e17055');
+                    ctx.beginPath(); ctx.arc(p.x, p.y, p.type === 'sniper' ? (6 + p.level) : 5, 0, Math.PI*2); ctx.fill();
+                } else {
+                    let bonus = p.level;
+                    if (p.type === 'jelly') { p.target.slowedTicks = 140 + bonus * 40; p.target.hp -= (9 * bonus); } 
+                    else if (p.type === 'sniper') { p.target.hp -= (58 * bonus * 1.4); } 
+                    else { p.target.hp -= (22 * bonus); }
+                    projectiles.splice(i, 1);
+                    if (p.target.hp <= 0) {
+                        let idx = enemies.indexOf(p.target);
+                        if (idx !== -1) { enemies.splice(idx, 1); energyStars += 10; updateHUDDisplay(); }
+                    }
+                }
+            }
+
+            for (let i = enemies.length - 1; i >= 0; i--) {
+                let e = enemies[i]; let moveSpeed = e.speed;
+                if (e.slowedTicks > 0) { e.slowedTicks--; moveSpeed *= 0.35; } 
+                e.x += moveSpeed;
+                ctx.fillStyle = e.color; ctx.beginPath(); ctx.arc(e.x, e.y, e.radius, 0, Math.PI * 2); ctx.fill();
+                if (e.slowedTicks > 0) { ctx.strokeStyle = '#00a8ff'; ctx.lineWidth = 3; ctx.stroke(); }
+                ctx.fillStyle = '#ff7675'; ctx.fillRect(e.x - 16, e.y - e.radius - 8, 32, 5);
+                ctx.fillStyle = '#4cd137'; ctx.fillRect(e.x - 16, e.y - e.radius - 8, (e.hp / e.maxHp) * 32, 5);
+
+                if (e.x >= 675) {
+                    enemies.splice(i, 1); hearts--; updateHUDDisplay();
+                    if (hearts <= 0) { triggerGameOver(false); return; }
+                }
+            }
+
+            if (preparationIntervalId !== null && preparationCountdown > 0) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.55)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.font = 'bold 24px Arial'; ctx.textAlign = 'center';
+                let gradient = ctx.createLinearGradient(150, 0, 550, 0);
+                gradient.addColorStop(0, '#f1c40f'); gradient.addColorStop(0.5, '#e67e22'); gradient.addColorStop(1, '#e74c3c');
+                ctx.fillStyle = gradient;
+                ctx.fillText(`⏰ 战前准备！怪兽将在 ${preparationCountdown} 秒后涌入...`, canvas.width / 2, 52);
+                ctx.font = '14px Arial'; ctx.fillStyle = '#bdc3c7';
+                ctx.fillText(`（现在是部署和升级防御塔的最佳安全时机）`, canvas.width / 2, 115);
+                ctx.textAlign = 'left';
+            }
+
+            loopAnimationId = requestAnimationFrame(runMainLoop);
+        }
+
+        function checkPuzzleWinCondition() {
+            let winState = true; const size = activeLevelMap.length;
+            for (let r = 0; r < size; r++) {
+                for (let c = 0; c < size; c++) {
+                    let cell = activeLevelMap[r][c];
+                    if (cell.type === 'W' && cell.ans !== 0 && cell.currentGuess !== cell.ans) winState = false;
+                }
+            }
+            if (winState) {
+                setTimeout(() => {
+                    if (currentLevelIndex === 9) { triggerGameOver(true); } 
+                    else {
+                        alert(`🌟 顺利通过第 ${currentLevelIndex + 1} 关！\n注意：下一关战场已清空。你将拥有 3 秒战前整备时间进行重新布塔，剩余能量完美保留！`);
+                        currentLevelIndex++; initLevelSession();
+                    }
+                }, 400);
+            }
+        }
+    </script>
+</body>
+</html>
